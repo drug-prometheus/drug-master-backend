@@ -3,6 +3,9 @@ from rest_framework.response import Response
 from rest_framework.parsers import JSONParser
 from .models import Patient, Pharmacist, Medication, PatientNote
 from rest_framework import status
+from django.contrib.auth.models import User
+from rest_framework.permissions import AllowAny
+from django.contrib.auth import authenticate, logout, login
 
 # 프론트에서 약물 사진 받아와서 분석 후 프론트로 분석 결과 전송
 class AnalyzingMedicine(APIView):
@@ -65,3 +68,27 @@ class PharmacistOpinion(APIView):
         note_list = [{'note': note.note, 'created_at': note.created_at} for note in patient_note]
 
         return Response({'note': note_list}, status=status.HTTP_200_OK)
+
+# 로그인    
+class LoginView(APIView):
+    def post(self, request, format=None):
+        username = request.data.get('username')
+        password = request.data.get('password')
+
+        user = authenticate(username=username, password=password)
+
+        if user is not None:
+            login(request=request, user=user)
+
+            return Response({
+                'message': '로그인 성공'
+            })
+        
+        return Response({'message': '로그인 실패'}, status=400)
+    
+# 로그아웃
+class LogoutView(APIView):
+    def post(self, request, format=None):
+        logout(request=request)
+
+        return Response({'message': '로그아웃 성공'}, status=status.HTTP_200_OK)
