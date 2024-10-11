@@ -33,9 +33,32 @@ class AddMedicineInfo(APIView):
     def post(self, request, format=None):
         # TODO: 받아온 약물 정보(이름)를 DB에 저장
         # ENDPOINT: 약물 정보(medicine_name), 환자 이름(patient)
-        patient = request.data.get('patient')
+        patient_name = request.data.get('patient')
         medicine_name = request.data.get('medicine_name') # 약물 이름
-        Medication.objects.create(patient=patient, medicine_name=medicine_name)
+        pharmacist_name = '약사1'
+        
+        # Pharmacist DB에 해당 약사가 존재하는지 확인
+        pharmacist, created = Pharmacist.objects.get_or_create(name=pharmacist_name)
+        if created:
+            print(f'[{pharmacist_name}] 약사가 새로 추가되었습니다.')
+        else:
+            print(f'[{pharmacist_name}] 약사는 이미 존재합니다.')
+
+        # Patient DB에 해당 환자가 존재하는지 확인
+        patient, created = Patient.objects.get_or_create(name=patient_name, pharmacist=pharmacist)
+        if created:
+            print(f'[{patient_name}] 환자가 새로 추가되었습니다.')
+        else:
+            print(f'[{patient_name}] 환자는 이미 존재합니다.')
+            
+        # Medication DB에 해당 약물이 존재하는지 확인
+        medication, created = Medication.objects.get_or_create(patient=patient, medication_name=medicine_name)
+        if created:
+            print(f'[{patient_name}] 환자의 새 약물 [{medicine_name}]이(가) 성공적으로 추가되었습니다.')
+            return Response({'message': f'{patient_name} 환자의 새 약물 {medicine_name}이(가) 성공적으로 추가되었습니다.'})
+        else:
+            print(f'[{patient_name}] 환자는 이미 [{medicine_name}] 약물을 복용 중입니다.')
+            return Response({'message': f'[{patient_name}] 환자는 이미 [{medicine_name}] 약물을 복용 중입니다.'})
 
 # 약 이름 검색(MainPage, SearchDrugPage)
 class SearchMedicine(APIView):
