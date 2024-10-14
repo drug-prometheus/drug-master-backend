@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from myapp.views import AnalyzingMedicine, AddMedicineInfo, SearchMedicine, PharmacistOpinion
-from myapp.views import PharmacistWithPatients, LoginView, LogoutView
+from myapp.views import PharmacistWithPatients, LoginView, LogoutView, SeeMediInfo
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
@@ -15,4 +15,5 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'), # logout
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('see-medi-info/', SeeMediInfo.as_view(), name='see-medi-info'), # 메인 화면에서 약물 정보 보기
 ]

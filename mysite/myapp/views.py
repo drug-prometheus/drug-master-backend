@@ -1,11 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser
-from .models import Patient, Pharmacist, Medication, PatientNote
+from .models import Patient, Pharmacist, Medication, PatientNote, MedicationInfo
 from rest_framework import status
 from django.contrib.auth.models import User
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate, logout, login
+from .serializers import MedicationInfoSerializer, NoCombinationSerializer, MedicationSerializer
 
 # 프론트에서 약물 사진 받아와서 분석 후 프론트로 분석 결과 전송
 class AnalyzingMedicine(APIView):
@@ -35,21 +36,14 @@ class AddMedicineInfo(APIView):
         # ENDPOINT: 약물 정보(medicine_name), 환자 이름(patient)
         patient_name = request.data.get('patient')
         medicine_name = request.data.get('medicine_name') # 약물 이름
-        pharmacist_name = '약사1'
         
-        # Pharmacist DB에 해당 약사가 존재하는지 확인
-        pharmacist, created = Pharmacist.objects.get_or_create(name=pharmacist_name)
-        if created:
-            print(f'[{pharmacist_name}] 약사가 새로 추가되었습니다.')
-        else:
-            print(f'[{pharmacist_name}] 약사는 이미 존재합니다.')
-
-        # Patient DB에 해당 환자가 존재하는지 확인
-        patient, created = Patient.objects.get_or_create(name=patient_name, pharmacist=pharmacist)
-        if created:
-            print(f'[{patient_name}] 환자가 새로 추가되었습니다.')
-        else:
-            print(f'[{patient_name}] 환자는 이미 존재합니다.')
+        # Patient DB에서 해당 환자를 검색하여 담당 약사를 알아냄
+        try:
+            patient = Patient.objects.get(name=patient_name)
+            pharmacist_name = patient.pharmacist.name
+            print(f'[{patient_name}] 환자의 담당 약사는 [{pharmacist_name}] 약사입니다.')
+        except Patient.DoesNotExist:
+            return Response({'message': f'[{patient_name}] 환자가 존재하지 않습니다.'}, status=404)
             
         # Medication DB에 해당 약물이 존재하는지 확인
         medication, created = Medication.objects.get_or_create(patient=patient, medication_name=medicine_name)
@@ -64,9 +58,20 @@ class AddMedicineInfo(APIView):
 class SearchMedicine(APIView):
     parser_classes = [JSONParser]
 
+    # DB에 저장된 약물 정보 모두 전송
+    def get(self, request, format=None):
+        medications = MedicationInfo.objects.all()
+        serializer = MedicationInfoSerializer(medications, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    # 약물 리스트에서 클릭했을 때 병용금기 정보가 뜸
     def post(self, request, format=None):
-        # POST 보내기 실패
-        pass
+        medication_name = request.data.get('medication_name') # 약물 이름
+        medication = Medication.objects.get(medication_name=medication_name)
+        serializer = NoCombinationSerializer(medication, many=True)
+
+        return Response({'no_mixture': serializer}, status=status.HTTP_200_OK)
 
 # DB(약사 소견 입력돼 있는 DB)에서 환자 이름과 일치하는 소견 데이터 불러와서 프론트로 전송
 class PharmacistWithPatients(APIView):
@@ -79,7 +84,6 @@ class PharmacistWithPatients(APIView):
         patients_names = [patient.name for patient in patients]
 
         return Response({'patient_names': patients_names}, status=status.HTTP_200_OK)
-
 
 class PharmacistOpinion(APIView):
     parser_classes = [JSONParser]
@@ -115,3 +119,23 @@ class LogoutView(APIView):
         logout(request=request)
 
         return Response({'message': '로그아웃 성공'}, status=status.HTTP_200_OK)
+    
+# 약물 정보 보기 (메인 화면)
+class SeeMediInfo(APIView):
+    def post(self, request, format=None):
+        patient_name = request.data.get('patient_name') # 환자 이름름
+
+        if patient_name is None:
+            return Response({'error': '환자 이름이 제공되지 않았습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            patient = Patient.objects.get(name=patient_name)
+        except Patient.DoesNotExist:
+            return Response({'error': '환자가 DB에 없습니다.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # 환자에 해당하는 Medication 리스트 가져오기
+        medications = Medication.objects.filter(patient=patient)
+
+        serializer = MedicationSerializer(medications, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)

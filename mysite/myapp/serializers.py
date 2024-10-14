@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Patient, Pharmacist, PatientNote, Medication
+from .models import Patient, Pharmacist, PatientNote, Medication, MedicationInfo
+from .models import NoCombination
 
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,4 +20,14 @@ class PatientNoteSerializer(serializers.ModelSerializer):
 class MedicationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Medication
-        fields = ['id', 'patient', 'medication_name']
+        fields = '__all__'
+
+class MedicationInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicationInfo
+        fields = '__all__'
+
+class NoCombinationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NoCombination
+        fields = '__all__'
