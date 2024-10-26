@@ -1,24 +1,49 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.parsers import JSONParser
+from rest_framework.parsers import JSONParser, MultiPartParser
 from .models import Patient, Pharmacist, Medication, PatientNote, MedicationInfo
 from rest_framework import status
 from django.contrib.auth.models import User
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate, logout, login
 from .serializers import MedicationInfoSerializer, NoCombinationSerializer, MedicationSerializer
+from tensorflow.keras.models import load_model
+import matplotlib.pyplot as plt
+from PIL import Image
+import numpy as np
+import os
+import io
 
 # 프론트에서 약물 사진 받아와서 분석 후 프론트로 분석 결과 전송
 class AnalyzingMedicine(APIView):
-    parser_classes = [JSONParser]
+    parser_classes = [MultiPartParser]
 
     def post(self, request, format=None):
-        # ENDPOINT: 사진(picture), 환자 이름(patient)
-        picture = request.data.get('picture')
-        patient = request.data.get('patient')
+        def test_backend(img_dir):
+            model = load_model(r'Pill_image_mobile_net.h5')
 
-        # TODO: AI 모델 연결하고 분석 결과 받는 코드
-        medicine_list = [] # 분석 결과: 약물 이름 리스트
+            image = Image.open(io.BytesIO(img_dir.read()))
+            if image.mode == 'RGBA':
+                image = image.convert('RGB')
+            print(image)
+            image = image.resize((100, 100))
+            image = np.array(image)
+            image = image/255.
+            
+            image = np.reshape(image, (1, 100, 100, 3))
+            
+            prediction = model.predict(image)
+            prediction.shape
+            pred_class = np.argmax(prediction, axis=-1)
+            print(pred_class)
+            
+            return pred_class
+
+        picture = request.POST.get('picture')
+        patient = request.POST.get('patient')
+
+        # 분석 결과: 약물 이름 리스트
+        medicine_list = test_backend(picture)
 
         # ENDPOINT: 분석 결과(약물 이름 리스트)
         # DB에 약물 정보 저장
@@ -26,15 +51,14 @@ class AnalyzingMedicine(APIView):
             Medication.objects.create(patient=patient, medicine_name=medicine_name)
 
         # TODO: 사진 분석 결과를 프론트로 다시 전송(Response)
+        return Response({'medication_list': medicine_list})
 
 # 프론트에서 입력한 약물 정보 받아와서 DB에 추가    
 class AddMedicineInfo(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request, format=None):
-        # TODO: 받아온 약물 정보(이름)를 DB에 저장
-        # ENDPOINT: 약물 정보(medicine_name), 환자 이름(patient)
-        patient_name = request.data.get('patient')
+        patient_name = request.data.get('patient') # 환자 이름
         medicine_name = request.data.get('medicine_name') # 약물 이름
         
         # Patient DB에서 해당 환자를 검색하여 담당 약사를 알아냄
@@ -85,6 +109,7 @@ class PharmacistWithPatients(APIView):
 
         return Response({'patient_names': patients_names}, status=status.HTTP_200_OK)
 
+# 약사 소견 데이터를 DB에서 불러와서 프론트로 전송
 class PharmacistOpinion(APIView):
     parser_classes = [JSONParser]
 
@@ -95,6 +120,25 @@ class PharmacistOpinion(APIView):
         note_list = [{'note': note.note, 'created_at': note.created_at} for note in patient_note]
 
         return Response({'note': note_list}, status=status.HTTP_200_OK)
+
+# 프론트에서 작성한 약사 소견서 DB에 저장
+class SavePharmacistOpinion(APIView):
+    parser_classes = [JSONParser]
+
+    def post(self, request, format=None):
+        patient_name = request.data.get('patient')
+        opinion = request.data.get('opinion')
+        
+        patient = Patient.objects.get(name=patient_name)
+        pharmacist_name = patient.pharmacist.name
+
+        patient_note = PatientNote.objects.create(
+            patient=patient,
+            pharmacist=patient.pharmacist,
+            note=opinion
+        )
+        
+        return Response({'message': f'약사 소견이 저장되었습니다.\n약사: {pharmacist_name}\n환자:{patient_name}'})
 
 # 로그인    
 class LoginView(APIView):
