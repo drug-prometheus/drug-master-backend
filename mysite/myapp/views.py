@@ -126,7 +126,7 @@ class SavePharmacistOpinion(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request, format=None):
-        patient_name = request.data.get('patient')
+        patient_name = request.data.get('patient').rstrip()
         opinion = request.data.get('opinion')
         
         patient = Patient.objects.get(name=patient_name)
