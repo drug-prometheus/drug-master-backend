@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser, MultiPartParser
-from .models import Patient, Pharmacist, Medication, PatientNote, MedicationInfo
+from .models import Patient, Pharmacist, Medication, PatientNote, MedicationInfo, NoCombination
 from rest_framework import status
 from django.contrib.auth.models import User
 from rest_framework.permissions import AllowAny
@@ -91,11 +91,14 @@ class SearchMedicine(APIView):
     
     # 약물 리스트에서 클릭했을 때 병용금기 정보가 뜸
     def post(self, request, format=None):
-        medication_name = request.data.get('medication_name') # 약물 이름
-        medication = Medication.objects.get(medication_name=medication_name)
-        serializer = NoCombinationSerializer(medication, many=True)
+        medication_name = request.data.get('medication_name').rstrip() # 약물 이름
+        medication = MedicationInfo.objects.get(medication_name=medication_name)
 
-        return Response({'no_mixture': serializer}, status=status.HTTP_200_OK)
+        no_combination_info = NoCombination.objects.filter(medication_name=medication)
+        serializer = NoCombinationSerializer(no_combination_info, many=True)
+        mix_medication_names = [item['mix_medication_name'] for item in serializer.data]
+
+        return Response({'no_mixture': mix_medication_names}, status=status.HTTP_200_OK)
 
 # DB(약사 소견 입력돼 있는 DB)에서 환자 이름과 일치하는 소견 데이터 불러와서 프론트로 전송
 class PharmacistWithPatients(APIView):
