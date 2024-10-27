@@ -13,6 +13,7 @@ from PIL import Image
 import numpy as np
 import os
 import io
+from django.conf import settings
 
 # 프론트에서 약물 사진 받아와서 분석 후 프론트로 분석 결과 전송
 class AnalyzingMedicine(APIView):
@@ -20,9 +21,10 @@ class AnalyzingMedicine(APIView):
 
     def post(self, request, format=None):
         def test_backend(img_dir):
-            model = load_model(r'Pill_image_mobile_net.h5')
-
-            image = Image.open(io.BytesIO(img_dir.read()))
+            model = load_model('C:\medical_contests\drug-master-backend\mysite\myapp\Pill_image_mobile_net.h5')
+            print(img_dir)
+            # image = Image.open(io.BytesIO(img_dir.read()))
+            image = Image.open(img_dir)
             if image.mode == 'RGBA':
                 image = image.convert('RGB')
             print(image)
@@ -39,8 +41,8 @@ class AnalyzingMedicine(APIView):
             
             return pred_class
 
-        picture = request.POST.get('picture')
-        patient = request.POST.get('patient')
+        picture = request.FILES.get('picture')
+        patient = request.FILES.get('patient')
 
         # 분석 결과: 약물 이름 리스트
         medicine_list = test_backend(picture)
