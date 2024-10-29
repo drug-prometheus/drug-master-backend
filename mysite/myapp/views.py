@@ -52,8 +52,25 @@ class AnalyzingMedicine(APIView):
         for medicine_name in medicine_list:
             Medication.objects.create(patient=patient, medicine_name=medicine_name)
 
+        # 병용금기 약물 리스트
+        no_combination_list = []
+
+        for medi_name in medicine_list:
+            try:
+                medication = MedicationInfo.objects.get(medication_name=medi_name)
+                no_combination_info = NoCombination.objects.filter(medication_name=medication)
+
+                if no_combination_info.exists():
+                    serializer = NoCombinationSerializer(no_combination_info, many=True)
+                    mix_medication_names = [item['mix_medication_name'] for item in serializer.data]
+                    no_combination_list.extend(mix_medication_names)
+            except MedicationInfo.DoesNotExist:
+                continue
+
+        no_combination_list = list(set(no_combination_list))
+
         # TODO: 사진 분석 결과를 프론트로 다시 전송(Response)
-        return Response({'medication_list': medicine_list})
+        return Response({'medication_list': medicine_list, 'no_combination_list': no_combination_list})
 
 # 프론트에서 입력한 약물 정보 받아와서 DB에 추가    
 class AddMedicineInfo(APIView):
