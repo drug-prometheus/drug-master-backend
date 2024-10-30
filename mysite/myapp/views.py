@@ -179,7 +179,7 @@ class AnalyzingMedicine(APIView):
                 detected_pills.append(pills)
 
         picture = request.FILES.get('picture')
-        patient_name = request.FILES.get('patient')
+        patient_name = request.POST.get('patient')
         # patient_name이 None이라서 임시로.
         # patient_name = '정윤성'
         patient = Patient.objects.get(name=patient_name)
