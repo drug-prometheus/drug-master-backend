@@ -15,7 +15,8 @@ import os
 import torch
 import cv2
 import pathlib
-from io import BytesIO
+from django.http import HttpResponse
+import base64
 
 # 절대 경로
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -82,7 +83,7 @@ class AnalyzingMedicine(APIView):
 
         detected_pills = []
         bounding_boxs = []
-        output_image_path = test_sample + '/merge_img_1.jpg'
+        output_image_path = os.path.abspath(os.path.join(test_sample, 'merge_img_1.jpg'))
 
         def draw_bboxes(image_path, bounding_boxs_, output_path=None):
             # image = cv2.imread(image_path)
@@ -179,12 +180,16 @@ class AnalyzingMedicine(APIView):
                 detected_pills.append(pills)
 
         picture = request.FILES.get('picture')
-        patient_name = request.FILES.get('patient')
-        # patient_name이 None이라서 임시로.
-        # patient_name = '정윤성'
+        patient_name = request.POST.get('patient')
         patient = Patient.objects.get(name=patient_name)
 
+        # 사진 분석
         detect_and_crop_objects(picture)
+
+        # 사진 분석 과정에서 생성된 사진 삭제
+        delete_images_in_folder(test_sample)
+
+        # 바운딩 박스 그리기
         draw_bboxes(picture, bounding_boxs, output_image_path)
 
         # 분석 결과: 약물 이름 리스트
@@ -192,9 +197,6 @@ class AnalyzingMedicine(APIView):
         for pill in detected_pills:
             medicine_list.append(pill_name_kor[pill])
         print(medicine_list)
-
-        # 사진 분석 과정에서 생성된 사진 삭제
-        delete_images_in_folder(test_sample)
 
         # DB에 약물 정보 저장
         for medicine_name in medicine_list:
@@ -217,8 +219,13 @@ class AnalyzingMedicine(APIView):
 
         no_combination_list = list(set(no_combination_list))
 
+        # bounding box 처리된 이미지
+        with open(output_image_path, 'rb') as img_file:
+            encoded_string = base64.b64encode(img_file.read()).decode('utf-8')
+
         # TODO: 사진 분석 결과를 프론트로 다시 전송(Response)
-        return Response({'medication_list': medicine_list, 'no_combination_list': no_combination_list})
+        print(medicine_list, no_combination_list)
+        return Response({'medication_list': medicine_list, 'no_combination_list': no_combination_list, 'image': encoded_string}, status=status.HTTP_200_OK)
 
 # 프론트에서 입력한 약물 정보 받아와서 DB에 추가    
 class AddMedicineInfo(APIView):
